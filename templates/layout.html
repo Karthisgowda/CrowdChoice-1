@@ -15,11 +15,19 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <!-- Animated background elements -->
+    <div class="animated-bg">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="fas fa-poll me-2"></i>
-                Crowdsourced Decision Maker
+                <i class="fas fa-poll-h me-2"></i>
+                <span class="brand-text">Crowdsourced Decision Maker</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
                     aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -28,13 +36,19 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i> Home
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('create_poll') }}">Create Poll</a>
+                        <a class="nav-link" href="{{ url_for('create_poll') }}">
+                            <i class="fas fa-plus-circle me-1"></i> Create Poll
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('all_polls') }}">View All Polls</a>
+                        <a class="nav-link" href="{{ url_for('all_polls') }}">
+                            <i class="fas fa-list me-1"></i> View All Polls
+                        </a>
                     </li>
                 </ul>
             </div>
@@ -46,7 +60,7 @@
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
+                        <i class="fas fa-info-circle me-2"></i> {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 {% endfor %}
@@ -56,9 +70,17 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="bg-dark text-light py-4 mt-5">
+    <footer class="text-light py-4 mt-5">
         <div class="container text-center">
-            <p>Crowdsourced Decision Maker &copy; 2023. Made with <i class="fas fa-heart text-danger"></i> using Flask.</p>
+            <div class="footer-content">
+                <p>Crowdsourced Decision Maker &copy; 2025</p>
+                <div class="footer-icons">
+                    <i class="fas fa-poll-h icon-pulse"></i>
+                    <i class="fas fa-chart-bar icon-pulse"></i>
+                    <i class="fas fa-vote-yea icon-pulse"></i>
+                </div>
+                <p class="made-with">Made with <i class="fas fa-code text-white"></i> using Flask</p>
+            </div>
         </div>
     </footer>
 
@@ -67,5 +89,32 @@
     <!-- Main JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
+    
+    <script>
+    // Dynamic SVG wave background animation
+    document.addEventListener('DOMContentLoaded', function() {
+        // Slow movement of background shapes
+        const shapes = document.querySelectorAll('.shape');
+        shapes.forEach(shape => {
+            setInterval(() => {
+                // Random position within boundaries
+                const x = Math.random() * 10 - 5;
+                const y = Math.random() * 10 - 5;
+                shape.style.transform = `translate(${x}px, ${y}px)`;
+            }, 3000);
+        });
+        
+        // Add active class to current nav item
+        const currentPath = window.location.pathname;
+        const navLinks = document.querySelectorAll('.nav-link');
+        
+        navLinks.forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+                link.innerHTML = `<span class="nav-indicator">●</span> ${link.innerHTML}`;
+            }
+        });
+    });
+    </script>
 </body>
 </html>

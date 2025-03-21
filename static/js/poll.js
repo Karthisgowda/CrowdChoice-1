@@ -122,8 +122,8 @@ function updateResultsChart(pollData) {
     const votes = pollData.options.map(option => option.votes);
     const totalVotes = votes.reduce((sum, current) => sum + current, 0);
     
-    // Generate colors for each option
-    const backgroundColors = generateRandomColors(labels.length);
+    // Generate monochromatic colors for each option
+    const backgroundColors = generateMonochromeColors(labels.length);
     
     // Destroy existing chart if it exists
     if (chart) {
@@ -139,18 +139,37 @@ function updateResultsChart(pollData) {
                 label: 'Votes',
                 data: votes,
                 backgroundColor: backgroundColors,
-                borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
-                borderWidth: 1
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderWidth: 1,
+                borderRadius: 4,
+                barPercentage: 0.7,
+                hoverBackgroundColor: backgroundColors.map(color => {
+                    // Lighten color on hover
+                    return color.replace(/rgba\((\d+), (\d+), (\d+), ([\d\.]+)\)/, 
+                        (match, r, g, b, a) => `rgba(${parseInt(r)+20}, ${parseInt(g)+20}, ${parseInt(b)+20}, ${a})`);
+                })
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 1000,
+                easing: 'easeOutQuart'
+            },
             plugins: {
                 legend: {
                     display: false
                 },
                 tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleFont: {
+                        weight: 'bold',
+                        size: 14
+                    },
+                    padding: 10,
+                    cornerRadius: 0,
+                    displayColors: false,
                     callbacks: {
                         label: function(context) {
                             const value = context.raw;
@@ -163,8 +182,27 @@ function updateResultsChart(pollData) {
             scales: {
                 y: {
                     beginAtZero: true,
+                    border: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.05)',
+                        lineWidth: 0.5
+                    },
                     ticks: {
-                        precision: 0
+                        precision: 0,
+                        color: 'rgba(255, 255, 255, 0.7)'
+                    }
+                },
+                x: {
+                    border: {
+                        color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)'
                     }
                 }
             }
