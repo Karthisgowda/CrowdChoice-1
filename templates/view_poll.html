@@ -102,10 +102,23 @@
                     </button>
                 </div>
                 
-                <div class="d-grid gap-2">
+                <div class="social-share-buttons">
+                    <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url|urlencode }}"
+                       target="_blank" class="btn btn-outline-primary social-share-btn">
+                        <i class="fab fa-facebook-f me-1"></i> Facebook
+                    </a>
                     <a href="https://twitter.com/intent/tweet?text={{ 'Help me decide: ' + poll.title|urlencode }}&url={{ request.url|urlencode }}"
-                       target="_blank" class="btn btn-outline-info">
-                        <i class="fab fa-twitter me-1"></i> Share on Twitter
+                       target="_blank" class="btn btn-outline-info social-share-btn">
+                        <i class="fab fa-twitter me-1"></i> Twitter
+                    </a>
+                    <a href="https://www.linkedin.com/shareArticle?mini=true&url={{ request.url|urlencode }}&title={{ poll.title|urlencode }}&summary={{ poll.description|urlencode if poll.description else '' }}"
+                       target="_blank" class="btn btn-outline-secondary social-share-btn">
+                        <i class="fab fa-linkedin-in me-1"></i> LinkedIn
+                    </a>
+                    <a href="https://www.instagram.com/" target="_blank" 
+                       class="btn btn-outline-danger social-share-btn" 
+                       data-bs-toggle="tooltip" title="Instagram doesn't support direct link sharing, but you can copy the link and share it in your Instagram bio or story">
+                        <i class="fab fa-instagram me-1"></i> Instagram
                     </a>
                 </div>
             </div>
@@ -136,6 +149,12 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize the poll view with the poll ID
         initPollView('{{ poll.id }}', {{ has_voted|tojson }});
+        
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
         
         // Handle copy link functionality
         document.getElementById('copyLinkBtn').addEventListener('click', function() {
