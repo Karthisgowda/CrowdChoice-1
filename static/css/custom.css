@@ -1,0 +1,105 @@
+/* Custom CSS styles for the Crowdsourced Decision Maker app */
+
+/* Make sure the page takes up full height for sticky footer */
+html, body {
+    height: 100%;
+    min-height: 100vh;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+footer {
+    flex-shrink: 0;
+}
+
+/* Customize progress bars */
+.progress-bar {
+    transition: width 0.5s ease-in-out;
+}
+
+/* Card hover effects */
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Custom styles for the list items on the all polls page */
+.list-group-item {
+    transition: background-color 0.2s;
+}
+
+/* Share URL input styles */
+#shareUrl {
+    background-color: rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+}
+
+/* Option entry styling for create poll page */
+.option-entry {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+/* Chart container styles */
+.chart-container {
+    margin: 0 auto;
+    max-width: 100%;
+}
+
+/* Loading animation styles */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.spinner-border {
+    animation: spinner-border 0.75s linear infinite, pulse 2s ease infinite;
+}
+
+/* Poll results visualization enhancements */
+#optionResults .progress {
+    height: 30px;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+#optionResults .progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    transition: width 1s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-4 {
+        font-size: 2rem;
+    }
+    
+    .h1, h1 {
+        font-size: 1.8rem;
+    }
+    
+    .h2, h2 {
+        font-size: 1.6rem;
+    }
+}

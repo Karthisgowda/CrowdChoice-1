@@ -1,0 +1,91 @@
+{% extends 'layout.html' %}
+
+{% block title %}Home - Crowdsourced Decision Maker{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-5">
+    <div class="col-lg-7">
+        <h1 class="display-4 fw-bold">Make better decisions together</h1>
+        <p class="lead">Create polls, gather votes, and visualize results in real-time. The easiest way to reach consensus.</p>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+            <a href="{{ url_for('create_poll') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                <i class="fas fa-plus-circle me-2"></i>Create a Poll
+            </a>
+            <a href="{{ url_for('all_polls') }}" class="btn btn-outline-secondary btn-lg px-4">
+                <i class="fas fa-list me-2"></i>Explore Polls
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-5 d-flex justify-content-center">
+        <div class="text-center mt-5 mt-lg-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bar-chart-2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-5">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-poll-h fs-1 mb-3 text-primary"></i>
+                <h3>Create</h3>
+                <p>Create custom polls with multiple options in seconds. Add descriptions to provide context.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-vote-yea fs-1 mb-3 text-primary"></i>
+                <h3>Vote</h3>
+                <p>Share your polls with a unique link. Voting is simple and results update in real-time.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-pie fs-1 mb-3 text-primary"></i>
+                <h3>Analyze</h3>
+                <p>Visualize results with beautiful charts. Track votes as they happen without refreshing.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Recent Polls</h2>
+                <a href="{{ url_for('all_polls') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_polls %}
+                    <div class="list-group">
+                        {% for poll in recent_polls %}
+                            <a href="{{ url_for('view_poll', poll_id=poll.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">{{ poll.title }}</h5>
+                                    <small>{{ poll.created_at.strftime('%Y-%m-%d') }}</small>
+                                </div>
+                                <p class="mb-1">{{ poll.description[:100] }}{% if poll.description|length > 100 %}...{% endif %}</p>
+                                <small>{{ poll.options|length }} options &middot; {{ poll.options|sum(attribute='votes') }} votes</small>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <p class="text-muted mb-0">No polls available yet. Be the first to create one!</p>
+                        <a href="{{ url_for('create_poll') }}" class="btn btn-primary mt-3">Create a Poll</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

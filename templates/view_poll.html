@@ -1,0 +1,154 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ poll.title }} - Crowdsourced Decision Maker{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('all_polls') }}">All Polls</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ poll.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h1 class="h3 mb-0">{{ poll.title }}</h1>
+            </div>
+            <div class="card-body">
+                {% if poll.description %}
+                    <p class="lead">{{ poll.description }}</p>
+                    <hr>
+                {% endif %}
+                
+                <div id="votingSection" {% if has_voted %}class="d-none"{% endif %}>
+                    <h3 class="h5 mb-3">Cast your vote:</h3>
+                    <form id="voteForm" data-poll-id="{{ poll.id }}">
+                        {% for option in poll.options %}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="radio" name="option" 
+                                       id="option{{ option.id }}" value="{{ option.id }}">
+                                <label class="form-check-label" for="option{{ option.id }}">
+                                    {{ option.text }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                        
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-vote-yea me-1"></i> Submit Vote
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div id="resultsSection" {% if not has_voted %}class="d-none"{% endif %}>
+                    <h3 class="h5 mb-3">Results:</h3>
+                    <div id="resultsContainer">
+                        <div class="chart-container" style="position: relative; height:300px;">
+                            <canvas id="resultsChart"></canvas>
+                        </div>
+                        
+                        <div id="optionResults" class="mt-4">
+                            <!-- Option results will be inserted here -->
+                        </div>
+                        
+                        <p class="text-muted mt-3">
+                            <i class="fas fa-info-circle me-1"></i> 
+                            Results update automatically in real-time.
+                        </p>
+                    </div>
+                </div>
+                
+                <div id="loadingIndicator" class="text-center py-5 d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Processing your vote...</p>
+                </div>
+                
+                <div id="errorMessage" class="alert alert-danger mt-3 d-none"></div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">Created on {{ poll.created_at.strftime('%Y-%m-%d at %H:%M') }}</small>
+                    <span id="totalVotes" class="badge bg-primary">
+                        {{ poll.options|sum(attribute='votes') }} votes
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Share this poll</h3>
+            </div>
+            <div class="card-body">
+                <p>Share this poll with others to gather more votes:</p>
+                
+                <div class="input-group mb-3">
+                    <input type="text" id="shareUrl" class="form-control" 
+                           value="{{ request.url }}" readonly>
+                    <button id="copyLinkBtn" class="btn btn-outline-primary" type="button">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="https://twitter.com/intent/tweet?text={{ 'Help me decide: ' + poll.title|urlencode }}&url={{ request.url|urlencode }}"
+                       target="_blank" class="btn btn-outline-info">
+                        <i class="fab fa-twitter me-1"></i> Share on Twitter
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3 class="h5 mb-0">Actions</h3>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('create_poll') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-plus-circle me-1"></i> Create New Poll
+                    </a>
+                    <a href="{{ url_for('all_polls') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i> View All Polls
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/poll.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize the poll view with the poll ID
+        initPollView('{{ poll.id }}', {{ has_voted|tojson }});
+        
+        // Handle copy link functionality
+        document.getElementById('copyLinkBtn').addEventListener('click', function() {
+            const shareUrl = document.getElementById('shareUrl');
+            shareUrl.select();
+            document.execCommand('copy');
+            
+            // Show visual feedback
+            this.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                this.innerHTML = '<i class="fas fa-copy"></i>';
+            }, 2000);
+        });
+    });
+</script>
+{% endblock %}

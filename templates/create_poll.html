@@ -1,0 +1,126 @@
+{% extends 'layout.html' %}
+
+{% block title %}Create a Poll - Crowdsourced Decision Maker{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h2 class="h4 mb-0">Create a New Poll</h2>
+            </div>
+            <div class="card-body">
+                <form id="pollForm" method="POST" action="{{ url_for('create_poll') }}">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Poll Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" 
+                               placeholder="What's your question?" required value="{{ title or '' }}">
+                        <div class="form-text">Be clear and specific with your question</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (optional)</label>
+                        <textarea class="form-control" id="description" name="description" 
+                                  rows="3" placeholder="Provide some context for your poll">{{ description or '' }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Options *</label>
+                        <p class="text-muted small mb-2">Add at least 2 options for people to choose from</p>
+                        
+                        <div id="optionsContainer">
+                            {% if options %}
+                                {% for option in options %}
+                                    <div class="option-entry input-group mb-2">
+                                        <input type="text" class="form-control" name="options" 
+                                               placeholder="Option {{ loop.index }}" required value="{{ option }}">
+                                        <button type="button" class="btn btn-outline-danger remove-option"
+                                                {% if loop.index <= 2 %}disabled{% endif %}>
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="option-entry input-group mb-2">
+                                    <input type="text" class="form-control" name="options" placeholder="Option 1" required>
+                                    <button type="button" class="btn btn-outline-danger remove-option" disabled>
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="option-entry input-group mb-2">
+                                    <input type="text" class="form-control" name="options" placeholder="Option 2" required>
+                                    <button type="button" class="btn btn-outline-danger remove-option" disabled>
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <button type="button" id="addOption" class="btn btn-outline-primary mt-2">
+                            <i class="fas fa-plus me-1"></i> Add Another Option
+                        </button>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-1"></i> Create Poll
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const optionsContainer = document.getElementById('optionsContainer');
+        const addOptionBtn = document.getElementById('addOption');
+        
+        // Function to update the remove button state
+        function updateRemoveButtons() {
+            const options = document.querySelectorAll('.option-entry');
+            options.forEach((option, index) => {
+                const removeBtn = option.querySelector('.remove-option');
+                // Only enable remove buttons if we have more than 2 options
+                removeBtn.disabled = options.length <= 2;
+            });
+        }
+        
+        // Add a new option field
+        addOptionBtn.addEventListener('click', function() {
+            const optionCount = document.querySelectorAll('.option-entry').length + 1;
+            
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'option-entry input-group mb-2';
+            optionDiv.innerHTML = `
+                <input type="text" class="form-control" name="options" placeholder="Option ${optionCount}" required>
+                <button type="button" class="btn btn-outline-danger remove-option">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            optionsContainer.appendChild(optionDiv);
+            updateRemoveButtons();
+            
+            // Focus the new input
+            optionDiv.querySelector('input').focus();
+        });
+        
+        // Remove an option field
+        optionsContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-option') || e.target.closest('.remove-option')) {
+                const optionEntry = e.target.closest('.option-entry');
+                optionEntry.remove();
+                updateRemoveButtons();
+            }
+        });
+        
+        // Initial update of remove buttons
+        updateRemoveButtons();
+    });
+</script>
+{% endblock %}
