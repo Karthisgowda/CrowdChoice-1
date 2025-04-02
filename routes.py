@@ -3,6 +3,7 @@ from flask import render_template, request, redirect, url_for, flash, jsonify, s
 from app import app, db
 from models import Poll, Option
 import logging
+from mongo_utils import log_vote_to_analytics, get_vote_analytics
 
 @app.route('/')
 def index():
@@ -47,7 +48,14 @@ def view_poll(poll_id):
     user_votes = session.get('user_votes', {})
     has_voted = poll_id in user_votes
     
-    return render_template('view_poll.html', poll=poll, has_voted=has_voted)
+    # Get analytics data if available
+    analytics = None
+    try:
+        analytics = get_vote_analytics(poll_id)
+    except Exception as e:
+        app.logger.error(f"Error fetching analytics: {e}")
+    
+    return render_template('view_poll.html', poll=poll, has_voted=has_voted, analytics=analytics)
 
 @app.route('/api/poll/<poll_id>')
 def get_poll_data(poll_id):
@@ -84,6 +92,15 @@ def vote():
     session['user_votes'] = user_votes
     
     db.session.commit()
+    
+    # Log vote for analytics
+    try:
+        user_ip = request.remote_addr
+        user_agent = request.headers.get('User-Agent', '')
+        log_vote_to_analytics(poll_id, option_id, user_ip, user_agent)
+        app.logger.info(f"Vote logged to analytics for poll {poll_id}, option {option_id}")
+    except Exception as e:
+        app.logger.error(f"Error logging vote to analytics: {e}")
     
     # Return the updated poll data
     poll = Poll.query.get(poll_id)

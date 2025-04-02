@@ -1,124 +1,190 @@
 """
-MongoDB Utility Functions for Polls Application
-This module provides functions to interact with MongoDB for analytics and data processing.
+Analytics Utility Functions for Polls Application
+This module provides functions for analytics and data processing using PostgreSQL.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app
-from bson.objectid import ObjectId
+from sqlalchemy import text, func
+from app import db
 
-def get_mongo_db():
+def log_vote_to_analytics(poll_id, option_id, user_ip, user_agent):
     """
-    Get the MongoDB database connection if available
+    Log vote data for analytics in PostgreSQL
     """
-    if current_app.config.get('MONGODB_CONNECTED', False):
-        from app import mongo_db
-        return mongo_db
-    return None
-
-def log_vote_to_mongodb(poll_id, option_id, user_ip, user_agent):
-    """
-    Log vote data to MongoDB for analytics
-    """
-    db = get_mongo_db()
-    if not db:
-        current_app.logger.warning("MongoDB not connected. Vote analytics not logged.")
-        return None
-    
     try:
-        vote_data = {
-            "poll_id": poll_id,
-            "option_id": option_id,
-            "timestamp": datetime.utcnow(),
-            "user_ip": user_ip,
-            "user_agent": user_agent
-        }
+        # Check if we have an analytics table, if not create it
+        with db.engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS vote_analytics (
+                    id SERIAL PRIMARY KEY,
+                    poll_id VARCHAR(36) NOT NULL,
+                    option_id INTEGER NOT NULL,
+                    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    user_ip VARCHAR(45),
+                    user_agent TEXT
+                )
+            """))
+            conn.commit()
         
-        result = db.vote_logs.insert_one(vote_data)
-        current_app.logger.info(f"Vote logged to MongoDB: {result.inserted_id}")
-        return result.inserted_id
+        # Now insert the vote analytics
+        with db.engine.connect() as conn:
+            result = conn.execute(text("""
+                INSERT INTO vote_analytics 
+                (poll_id, option_id, timestamp, user_ip, user_agent)
+                VALUES (:poll_id, :option_id, :timestamp, :user_ip, :user_agent)
+                RETURNING id
+            """), {
+                "poll_id": poll_id,
+                "option_id": option_id,
+                "timestamp": datetime.utcnow(),
+                "user_ip": user_ip,
+                "user_agent": user_agent
+            })
+            conn.commit()
+            inserted_id = result.scalar_one()
+            
+        current_app.logger.info(f"Vote logged to analytics table: {inserted_id}")
+        return inserted_id
     except Exception as e:
-        current_app.logger.error(f"Error logging vote to MongoDB: {e}")
+        current_app.logger.error(f"Error logging vote to analytics: {e}")
         return None
 
 def get_vote_analytics(poll_id):
     """
-    Get analytics for a specific poll
+    Get analytics for a specific poll from PostgreSQL
     """
-    db = get_mongo_db()
-    if not db:
-        current_app.logger.warning("MongoDB not connected. Analytics not available.")
-        return None
-    
     try:
-        # Get vote count by hour
-        pipeline = [
-            {"$match": {"poll_id": poll_id}},
-            {"$project": {
-                "hour": {"$hour": "$timestamp"},
-                "date": {"$dateToString": {"format": "%Y-%m-%d", "date": "$timestamp"}}
-            }},
-            {"$group": {
-                "_id": {"date": "$date", "hour": "$hour"},
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"_id.date": 1, "_id.hour": 1}}
-        ]
-        
-        hourly_votes = list(db.vote_logs.aggregate(pipeline))
-        
-        # Get vote count by user agent (browser type)
-        browser_pipeline = [
-            {"$match": {"poll_id": poll_id}},
-            {"$group": {
-                "_id": "$user_agent",
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"count": -1}}
-        ]
-        
-        browser_stats = list(db.vote_logs.aggregate(browser_pipeline))
-        
-        return {
-            "hourly_votes": hourly_votes,
-            "browser_stats": browser_stats,
-            "total_logged_votes": db.vote_logs.count_documents({"poll_id": poll_id})
-        }
+        # First make sure the table exists
+        with db.engine.connect() as conn:
+            table_check = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'vote_analytics'
+                )
+            """))
+            table_exists = table_check.scalar_one()
+            
+            if not table_exists:
+                return {
+                    "hourly_votes": [],
+                    "browser_stats": [],
+                    "total_logged_votes": 0
+                }
+            
+            # Get hourly votes
+            hourly_votes_query = text("""
+                SELECT 
+                    DATE(timestamp) as date,
+                    EXTRACT(HOUR FROM timestamp) as hour,
+                    COUNT(*) as count
+                FROM vote_analytics
+                WHERE poll_id = :poll_id
+                GROUP BY DATE(timestamp), EXTRACT(HOUR FROM timestamp)
+                ORDER BY date, hour
+            """)
+            
+            hourly_votes_result = conn.execute(hourly_votes_query, {"poll_id": poll_id})
+            hourly_votes = [
+                {
+                    "_id": {"date": str(row.date), "hour": int(row.hour)}, 
+                    "count": row.count
+                } 
+                for row in hourly_votes_result
+            ]
+            
+            # Get browser stats
+            browser_stats_query = text("""
+                SELECT 
+                    user_agent,
+                    COUNT(*) as count
+                FROM vote_analytics
+                WHERE poll_id = :poll_id
+                GROUP BY user_agent
+                ORDER BY count DESC
+            """)
+            
+            browser_stats_result = conn.execute(browser_stats_query, {"poll_id": poll_id})
+            browser_stats = [
+                {"_id": row.user_agent, "count": row.count} 
+                for row in browser_stats_result
+            ]
+            
+            # Get total votes
+            total_query = text("""
+                SELECT COUNT(*) as total
+                FROM vote_analytics
+                WHERE poll_id = :poll_id
+            """)
+            
+            total_result = conn.execute(total_query, {"poll_id": poll_id})
+            total_logged_votes = total_result.scalar_one()
+            
+            return {
+                "hourly_votes": hourly_votes,
+                "browser_stats": browser_stats,
+                "total_logged_votes": total_logged_votes
+            }
     except Exception as e:
-        current_app.logger.error(f"Error getting vote analytics from MongoDB: {e}")
-        return None
+        current_app.logger.error(f"Error getting vote analytics: {e}")
+        return {
+            "hourly_votes": [],
+            "browser_stats": [],
+            "total_logged_votes": 0
+        }
 
 def archive_old_polls(days=30):
     """
-    Archive polls older than specified days
+    Mark polls as archived that are older than specified days
     """
-    db = get_mongo_db()
-    if not db:
-        current_app.logger.warning("MongoDB not connected. Archiving not available.")
-        return False
-    
     try:
         from models import Poll
-        from app import db as sql_db
-        import datetime
         
         # Get polls older than the specified number of days
-        cutoff_date = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-        old_polls = Poll.query.filter(Poll.created_at < cutoff_date).all()
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
         
-        # Archive each poll to MongoDB
+        # Check if we have an archived_polls table, if not create it
+        with db.engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS archived_polls (
+                    id VARCHAR(36) PRIMARY KEY,
+                    title VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    archived_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    poll_data JSONB NOT NULL
+                )
+            """))
+            conn.commit()
+        
+        # Archive each old poll
+        old_polls = Poll.query.filter(Poll.created_at < cutoff_date).all()
         archived_count = 0
+        
         for poll in old_polls:
             # Convert the poll and its options to a dictionary
             poll_data = poll.to_dict()
-            poll_data['archived_at'] = datetime.datetime.utcnow()
             
-            # Insert into MongoDB archive collection
-            result = db.archived_polls.insert_one(poll_data)
-            if result.inserted_id:
+            # Insert into archived_polls table
+            with db.engine.connect() as conn:
+                conn.execute(text("""
+                    INSERT INTO archived_polls 
+                    (id, title, description, created_at, archived_at, poll_data)
+                    VALUES 
+                    (:id, :title, :description, :created_at, :archived_at, :poll_data)
+                    ON CONFLICT (id) DO NOTHING
+                """), {
+                    "id": poll.id,
+                    "title": poll.title,
+                    "description": poll.description,
+                    "created_at": poll.created_at,
+                    "archived_at": datetime.utcnow(),
+                    "poll_data": db.engine.dialect.json_serializer(poll_data)
+                })
+                conn.commit()
                 archived_count += 1
         
-        current_app.logger.info(f"Archived {archived_count} old polls to MongoDB")
+        current_app.logger.info(f"Archived {archived_count} old polls")
         return True
     except Exception as e:
-        current_app.logger.error(f"Error archiving old polls to MongoDB: {e}")
+        current_app.logger.error(f"Error archiving old polls: {e}")
         return False

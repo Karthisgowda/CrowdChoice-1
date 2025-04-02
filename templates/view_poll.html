@@ -124,7 +124,7 @@
             </div>
         </div>
         
-        <div class="card shadow-sm">
+        <div class="card shadow-sm mb-4">
             <div class="card-header">
                 <h3 class="h5 mb-0">Actions</h3>
             </div>
@@ -139,6 +139,41 @@
                 </div>
             </div>
         </div>
+
+        {% if analytics and has_voted %}
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="h5 mb-0">Poll Analytics</h3>
+                <span class="badge bg-info">{{ analytics.total_logged_votes }} tracked votes</span>
+            </div>
+            <div class="card-body">
+                {% if analytics.hourly_votes %}
+                <div class="mb-3">
+                    <h4 class="h6">Voting Activity</h4>
+                    <div class="chart-container" style="position: relative; height:200px;">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if analytics.browser_stats %}
+                <div>
+                    <h4 class="h6">Voter Devices</h4>
+                    <div class="list-group list-group-flush">
+                        {% for browser in analytics.browser_stats[:3] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="text-truncate" style="max-width: 200px;" title="{{ browser._id }}">
+                                {{ browser._id|truncate(30) }}
+                            </span>
+                            <span class="badge bg-primary rounded-pill">{{ browser.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
@@ -168,6 +203,72 @@
                 this.innerHTML = '<i class="fas fa-copy"></i>';
             }, 2000);
         });
+        
+        // Initialize analytics charts if data is available
+        {% if analytics and analytics.hourly_votes %}
+        const activityChart = document.getElementById('activityChart');
+        if (activityChart) {
+            const hourlyData = {{ analytics.hourly_votes|tojson }};
+            
+            // Prepare data for the chart
+            const labels = [];
+            const data = [];
+            
+            // Sort by date and hour
+            hourlyData.sort((a, b) => {
+                if (a._id.date !== b._id.date) {
+                    return a._id.date.localeCompare(b._id.date);
+                }
+                return a._id.hour - b._id.hour;
+            });
+            
+            // Extract labels and data
+            hourlyData.forEach(item => {
+                const dateObj = new Date(item._id.date);
+                const month = dateObj.getMonth() + 1;
+                const day = dateObj.getDate();
+                const hour = item._id.hour;
+                labels.push(`${month}/${day} ${hour}:00`);
+                data.push(item.count);
+            });
+            
+            // Create activity chart
+            new Chart(activityChart, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Votes',
+                        data: data,
+                        backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            displayColors: false
+                        }
+                    },
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        {% endif %}
     });
 </script>
 {% endblock %}
