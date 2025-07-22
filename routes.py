@@ -123,6 +123,27 @@ def all_polls():
 def page_not_found(e):
     return render_template('index.html', error='Page not found'), 404
 
+@app.route('/delete_poll/<poll_id>', methods=['POST'])
+def delete_poll(poll_id):
+    poll = Poll.query.get_or_404(poll_id)
+    
+    try:
+        # Delete all options associated with the poll first
+        for option in poll.options:
+            db.session.delete(option)
+        
+        # Delete the poll
+        db.session.delete(poll)
+        db.session.commit()
+        
+        flash('Poll deleted successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting poll: {e}")
+        flash('Error deleting poll. Please try again.', 'danger')
+    
+    return redirect(url_for('all_polls'))
+
 @app.errorhandler(500)
 def server_error(e):
     app.logger.error(f"Server error: {e}")

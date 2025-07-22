@@ -19,12 +19,13 @@ db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default-secret-key-for-development")
 
-# Configure MySQL database (for XAMPP/phpMyAdmin)
-# Format: mysql+pymysql://username:password@localhost/db_name
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", 
-    "mysql+pymysql://root:@localhost/crowdsourced_decisions"
-)
+# Configure database - supports PostgreSQL for Render and MySQL for local XAMPP
+database_url = os.environ.get("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    # Fix for newer psycopg2 versions that expect postgresql://
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url or "mysql+pymysql://root:@localhost/crowdsourced_decisions"
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
