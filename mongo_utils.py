@@ -4,17 +4,27 @@ This module provides functions for analytics and data processing using PostgreSQ
 """
 from datetime import datetime, timedelta
 from flask import current_app
-from sqlalchemy import text, func
+from sqlalchemy import inspect, text
 from app import db
 
 def log_vote_to_analytics(poll_id, option_id, user_ip, user_agent):
     """
-    Log vote data for analytics in PostgreSQL
+    Log vote data for analytics.
     """
     try:
-        # Check if we have an analytics table, if not create it
-        with db.engine.connect() as conn:
-            conn.execute(text("""
+        dialect = db.engine.dialect.name
+        create_table_sql = """
+            CREATE TABLE IF NOT EXISTS vote_analytics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                poll_id VARCHAR(36) NOT NULL,
+                option_id INTEGER NOT NULL,
+                timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_ip VARCHAR(45),
+                user_agent TEXT
+            )
+        """
+        if dialect == "postgresql":
+            create_table_sql = """
                 CREATE TABLE IF NOT EXISTS vote_analytics (
                     id SERIAL PRIMARY KEY,
                     poll_id VARCHAR(36) NOT NULL,
@@ -23,26 +33,38 @@ def log_vote_to_analytics(poll_id, option_id, user_ip, user_agent):
                     user_ip VARCHAR(45),
                     user_agent TEXT
                 )
-            """))
-            conn.commit()
-        
-        # Now insert the vote analytics
-        with db.engine.connect() as conn:
-            result = conn.execute(text("""
-                INSERT INTO vote_analytics 
-                (poll_id, option_id, timestamp, user_ip, user_agent)
-                VALUES (:poll_id, :option_id, :timestamp, :user_ip, :user_agent)
-                RETURNING id
-            """), {
-                "poll_id": poll_id,
-                "option_id": option_id,
-                "timestamp": datetime.utcnow(),
-                "user_ip": user_ip,
-                "user_agent": user_agent
-            })
-            conn.commit()
-            inserted_id = result.scalar_one()
-            
+            """
+
+        with db.engine.begin() as conn:
+            conn.execute(text(create_table_sql))
+            if dialect == "postgresql":
+                result = conn.execute(text("""
+                    INSERT INTO vote_analytics
+                    (poll_id, option_id, timestamp, user_ip, user_agent)
+                    VALUES (:poll_id, :option_id, :timestamp, :user_ip, :user_agent)
+                    RETURNING id
+                """), {
+                    "poll_id": poll_id,
+                    "option_id": option_id,
+                    "timestamp": datetime.utcnow(),
+                    "user_ip": user_ip,
+                    "user_agent": user_agent
+                })
+                inserted_id = result.scalar_one()
+            else:
+                result = conn.execute(text("""
+                    INSERT INTO vote_analytics
+                    (poll_id, option_id, timestamp, user_ip, user_agent)
+                    VALUES (:poll_id, :option_id, :timestamp, :user_ip, :user_agent)
+                """), {
+                    "poll_id": poll_id,
+                    "option_id": option_id,
+                    "timestamp": datetime.utcnow(),
+                    "user_ip": user_ip,
+                    "user_agent": user_agent
+                })
+                inserted_id = result.lastrowid
+
         current_app.logger.info(f"Vote logged to analytics table: {inserted_id}")
         return inserted_id
     except Exception as e:
@@ -51,50 +73,59 @@ def log_vote_to_analytics(poll_id, option_id, user_ip, user_agent):
 
 def get_vote_analytics(poll_id):
     """
-    Get analytics for a specific poll from PostgreSQL
+    Get analytics for a specific poll.
     """
     try:
-        # First make sure the table exists
+        table_exists = inspect(db.engine).has_table("vote_analytics")
+        if not table_exists:
+            return {
+                "hourly_votes": [],
+                "browser_stats": [],
+                "total_logged_votes": 0
+            }
+
+        dialect = db.engine.dialect.name
+        hourly_votes_query = text("""
+            SELECT
+                DATE(timestamp) as date,
+                EXTRACT(HOUR FROM timestamp) as hour,
+                COUNT(*) as count
+            FROM vote_analytics
+            WHERE poll_id = :poll_id
+            GROUP BY DATE(timestamp), EXTRACT(HOUR FROM timestamp)
+            ORDER BY date, hour
+        """)
+        if dialect == "sqlite":
+            hourly_votes_query = text("""
+                SELECT
+                    DATE(timestamp) as date,
+                    CAST(STRFTIME('%H', timestamp) AS INTEGER) as hour,
+                    COUNT(*) as count
+                FROM vote_analytics
+                WHERE poll_id = :poll_id
+                GROUP BY DATE(timestamp), STRFTIME('%H', timestamp)
+                ORDER BY date, hour
+            """)
+
         with db.engine.connect() as conn:
-            table_check = conn.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'vote_analytics'
-                )
-            """))
-            table_exists = table_check.scalar_one()
-            
             if not table_exists:
                 return {
                     "hourly_votes": [],
                     "browser_stats": [],
                     "total_logged_votes": 0
                 }
-            
-            # Get hourly votes
-            hourly_votes_query = text("""
-                SELECT 
-                    DATE(timestamp) as date,
-                    EXTRACT(HOUR FROM timestamp) as hour,
-                    COUNT(*) as count
-                FROM vote_analytics
-                WHERE poll_id = :poll_id
-                GROUP BY DATE(timestamp), EXTRACT(HOUR FROM timestamp)
-                ORDER BY date, hour
-            """)
-            
+
             hourly_votes_result = conn.execute(hourly_votes_query, {"poll_id": poll_id})
             hourly_votes = [
                 {
-                    "_id": {"date": str(row.date), "hour": int(row.hour)}, 
+                    "_id": {"date": str(row.date), "hour": int(row.hour)},
                     "count": row.count
-                } 
+                }
                 for row in hourly_votes_result
             ]
-            
-            # Get browser stats
+
             browser_stats_query = text("""
-                SELECT 
+                SELECT
                     user_agent,
                     COUNT(*) as count
                 FROM vote_analytics
@@ -102,23 +133,22 @@ def get_vote_analytics(poll_id):
                 GROUP BY user_agent
                 ORDER BY count DESC
             """)
-            
+
             browser_stats_result = conn.execute(browser_stats_query, {"poll_id": poll_id})
             browser_stats = [
-                {"_id": row.user_agent, "count": row.count} 
+                {"_id": row.user_agent, "count": row.count}
                 for row in browser_stats_result
             ]
-            
-            # Get total votes
+
             total_query = text("""
                 SELECT COUNT(*) as total
                 FROM vote_analytics
                 WHERE poll_id = :poll_id
             """)
-            
+
             total_result = conn.execute(total_query, {"poll_id": poll_id})
             total_logged_votes = total_result.scalar_one()
-            
+
             return {
                 "hourly_votes": hourly_votes,
                 "browser_stats": browser_stats,

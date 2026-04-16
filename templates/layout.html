@@ -73,7 +73,7 @@
     <footer class="text-light py-4 mt-5">
         <div class="container text-center">
             <div class="footer-content">
-                <p>Crowdsourced Decision Maker &copy; 2025</p>
+                <p>Crowdsourced Decision Maker &copy; 2026</p>
                 <div class="footer-icons">
                     <i class="fas fa-poll-h icon-pulse"></i>
                     <i class="fas fa-chart-bar icon-pulse"></i>
@@ -116,7 +116,7 @@
         navLinks.forEach(link => {
             if (link.getAttribute('href') === currentPath) {
                 link.classList.add('active');
-                link.innerHTML = `<span class="nav-indicator">●</span> ${link.innerHTML}`;
+                link.innerHTML = `<span class="nav-indicator">&#9679;</span> ${link.innerHTML}`;
             }
         });
     });
